@@ -1,6 +1,11 @@
 const RENDERER_URL = process.env.RENDERER_URL || "http://localhost:8000";
 const RENDERER_API_KEY = process.env.RENDERER_API_KEY || "";
 
+// Modal endpoints have the function name in the URL already (e.g. ...render.modal.run)
+// Docker/self-hosted endpoints need /render appended
+const isModalUrl = RENDERER_URL.includes(".modal.run");
+const RENDER_ENDPOINT = isModalUrl ? RENDERER_URL : `${RENDERER_URL}/render`;
+
 export interface RenderResult {
   success: boolean;
   videoUrl?: string;
@@ -17,7 +22,7 @@ export async function renderManimCode(code: string): Promise<RenderResult> {
     headers["Authorization"] = `Bearer ${RENDERER_API_KEY}`;
   }
 
-  const response = await fetch(`${RENDERER_URL}/render`, {
+  const response = await fetch(RENDER_ENDPOINT, {
     method: "POST",
     headers,
     body: JSON.stringify({ code }),

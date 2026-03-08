@@ -42,9 +42,43 @@ You need:
 
 ## Step 2: Deploy the Manim Renderer
 
-The renderer is a Python server that takes Manim code, runs it, and returns a video. It needs Linux + Cairo + FFmpeg + LaTeX, which is why we use Docker.
+The renderer is a Python server that takes Manim code, runs it, and returns a video. It needs Linux + Cairo + FFmpeg + LaTeX.
 
-### Option A: Run Locally (Easiest for Testing)
+### Option A: Deploy to Modal.com (Easiest — No Docker Required)
+
+Modal handles all the infrastructure for you. No Docker, no servers.
+
+1. Install Modal:
+```bash
+pip install modal
+```
+
+2. Create a Modal account and authenticate:
+```bash
+modal setup
+```
+
+3. Deploy the renderer:
+```bash
+modal deploy renderer/modal_renderer.py
+```
+
+4. Modal prints your endpoint URLs. Copy the `render` endpoint URL — it looks like:
+```
+https://YOUR_USERNAME--mathviz-renderer-render.modal.run
+```
+
+Set `RENDERER_URL` to this exact URL. The app auto-detects Modal URLs and handles routing correctly.
+
+Test it works:
+```bash
+curl https://YOUR_USERNAME--mathviz-renderer-health.modal.run
+# Should return: {"status":"ok"}
+```
+
+> **Note:** Modal auto-scales to zero when idle and cold-starts in ~10-20s. First render after idle will be slower.
+
+### Option B: Run Locally with Docker (For Local Testing)
 
 ```bash
 # From the project root
@@ -65,7 +99,7 @@ curl http://localhost:8000/health
 
 Your renderer URL is: `http://localhost:8000`
 
-### Option B: Deploy to Railway.app (Recommended for Production)
+### Option C: Deploy to Railway.app
 
 Railway makes it dead simple to deploy Docker containers.
 
@@ -78,7 +112,7 @@ Railway makes it dead simple to deploy Docker containers.
 
 That's your renderer URL.
 
-### Option C: Deploy to Fly.io
+### Option D: Deploy to Fly.io
 
 ```bash
 # Install flyctl: https://fly.io/docs/flyctl/install/
@@ -96,7 +130,7 @@ fly status
 # Your URL is: https://mathviz-renderer.fly.dev
 ```
 
-### Option D: Deploy to a VPS (DigitalOcean, Hetzner, etc.)
+### Option E: Deploy to a VPS (DigitalOcean, Hetzner, etc.)
 
 ```bash
 # SSH into your server
@@ -219,6 +253,7 @@ docker run --platform linux/amd64 -p 8000:8000 mathviz-renderer
 | Component | Cost |
 |-----------|------|
 | Vercel (frontend) | Free tier is fine for personal use |
+| Modal (renderer) | Free tier: $30/month credit. Plenty for personal use |
 | Railway (renderer) | Free tier: 500 hours/month. Plenty for personal use |
 | Claude API (Sonnet) | ~$0.01-0.03 per generation |
 | Claude API (Opus) | ~$0.10-0.30 per generation |
@@ -235,5 +270,6 @@ docker run --platform linux/amd64 -p 8000:8000 mathviz-renderer
 | API route | `app/api/generate/route.ts` |
 | Claude integration | `lib/claude.ts` + `lib/prompts.ts` |
 | Renderer client | `lib/renderer.ts` |
-| Manim renderer | `renderer/` |
+| Manim renderer (Docker) | `renderer/render_server.py` + `renderer/Dockerfile` |
+| Manim renderer (Modal) | `renderer/modal_renderer.py` |
 | Environment variables | `.env.local` (local) or Vercel dashboard (prod) |
