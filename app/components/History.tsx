@@ -14,6 +14,7 @@ export interface HistoryEntry {
 
 const STORAGE_KEY = "mathviz_history";
 const MAX_HISTORY = 20;
+const HISTORY_UPDATED_EVENT = "mathviz-history-updated";
 
 export function getHistory(): HistoryEntry[] {
   if (typeof window === "undefined") return [];
@@ -36,11 +37,13 @@ export function addToHistory(entry: Omit<HistoryEntry, "id" | "timestamp">) {
   newEntry.videoBase64 = null;
   const updated = [newEntry, ...history].slice(0, MAX_HISTORY);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  window.dispatchEvent(new Event(HISTORY_UPDATED_EVENT));
   return newEntry;
 }
 
 export function clearHistory() {
   localStorage.removeItem(STORAGE_KEY);
+  window.dispatchEvent(new Event(HISTORY_UPDATED_EVENT));
 }
 
 interface HistoryProps {
@@ -53,7 +56,18 @@ export default function History({ onSelect, isOpen, onToggle }: HistoryProps) {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
-    setEntries(getHistory());
+    const syncHistory = () => {
+      setEntries(getHistory());
+    };
+
+    syncHistory();
+    window.addEventListener(HISTORY_UPDATED_EVENT, syncHistory);
+    window.addEventListener("storage", syncHistory);
+
+    return () => {
+      window.removeEventListener(HISTORY_UPDATED_EVENT, syncHistory);
+      window.removeEventListener("storage", syncHistory);
+    };
   }, []);
 
   const handleClear = () => {
