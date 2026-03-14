@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import InputPanel from "./components/InputPanel";
 import VideoPlayer from "./components/VideoPlayer";
 import Explanation from "./components/Explanation";
 import CodeViewer from "./components/CodeViewer";
 import LoadingState from "./components/LoadingState";
-import History, {
-  addToHistory,
-  type HistoryEntry,
-} from "./components/History";
+import History, { type HistoryEntry } from "./components/History";
+import UserMenu from "./components/UserMenu";
 
 interface GenerationResult {
   success: boolean;
@@ -24,11 +23,45 @@ interface GenerationResult {
 type Phase = "idle" | "generating" | "rendering" | "retrying" | "done" | "error";
 
 export default function Home() {
+  const { data: session } = useSession();
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // One-time migration of localStorage history to server
+  useEffect(() => {
+    if (!session?.user) return;
+
+    async function migrateLocalStorage() {
+      const raw = localStorage.getItem("mathviz_history");
+      if (!raw) return;
+
+      try {
+        const localEntries = JSON.parse(raw);
+        for (const entry of localEntries) {
+          await fetch("/api/history", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: entry.prompt,
+              explanation: entry.explanation,
+              manimCode: entry.manimCode,
+              videoUrl: entry.videoUrl || null,
+            }),
+          });
+        }
+        localStorage.removeItem("mathviz_history");
+        setRefreshKey((k) => k + 1);
+      } catch {
+        // If migration fails, leave localStorage intact for next attempt
+      }
+    }
+
+    migrateLocalStorage();
+  }, [session?.user]);
 
   const handleGenerate = useCallback(async (prompt: string) => {
     setPhase("generating");
@@ -63,14 +96,8 @@ export default function Home() {
       setResult(data);
       setPhase("done");
 
-      // Add to history
-      addToHistory({
-        prompt,
-        explanation: data.explanation,
-        manimCode: data.manimCode,
-        videoBase64: data.videoBase64,
-        videoUrl: data.videoUrl,
-      });
+      // Trigger history refresh (server already saved the entry)
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setPhase("error");
@@ -80,7 +107,7 @@ export default function Home() {
   const handleHistorySelect = useCallback((entry: HistoryEntry) => {
     setResult({
       success: true,
-      videoBase64: entry.videoBase64,
+      videoBase64: null,
       videoUrl: entry.videoUrl,
       explanation: entry.explanation,
       manimCode: entry.manimCode,
@@ -99,6 +126,7 @@ export default function Home() {
         onSelect={handleHistorySelect}
         isOpen={historyOpen}
         onToggle={() => setHistoryOpen(!historyOpen)}
+        refreshKey={refreshKey}
       />
 
       <main className="flex-1 min-w-0">
@@ -113,7 +141,10 @@ export default function Home() {
                 Describe a math concept, get an animation + explanation
               </p>
             </div>
-            <DarkModeToggle />
+            <div className="flex items-center gap-2">
+              <DarkModeToggle />
+              <UserMenu />
+            </div>
           </header>
 
           {/* Input */}

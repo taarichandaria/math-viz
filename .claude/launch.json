@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Next.js Dev Server",
+      "runtimeExecutable": "/Users/taarichandaria/.nvm/versions/node/v24.4.0/bin/node",
+      "runtimeArgs": ["node_modules/.bin/next", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "Manim Render Server",
+      "runtimeExecutable": "/opt/anaconda3/bin/python3",
+      "runtimeArgs": ["renderer/render_server.py"],
+      "port": 8000
+    }
+  ]
+}
