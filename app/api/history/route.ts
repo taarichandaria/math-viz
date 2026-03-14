@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isAuthConfigured } from "@/lib/runtime-config";
 
 const MAX_HISTORY = 50;
 
 export async function GET() {
+  if (!isAuthConfigured || !prisma) {
+    return NextResponse.json({ entries: [] });
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -28,6 +33,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isAuthConfigured || !prisma) {
+    return NextResponse.json({ entry: null }, { status: 200 });
+  }
+
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
