@@ -29,6 +29,7 @@ export default function UserMenu() {
         className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
       >
         {session.user.image ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={session.user.image}
             alt=""
