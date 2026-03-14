@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateVisualization, retryWithError } from "@/lib/claude";
 import { renderManimCode } from "@/lib/renderer";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export const maxDuration = 120;
 
@@ -11,6 +13,11 @@ interface GenerateRequest {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+    }
+
     const body: GenerateRequest = await req.json();
 
     if (!body.prompt || body.prompt.trim().length === 0) {
@@ -55,6 +62,17 @@ export async function POST(req: NextRequest) {
         break;
       }
     }
+
+    // Save to history automatically
+    await prisma.historyEntry.create({
+      data: {
+        userId: session.user.id,
+        prompt: body.prompt,
+        explanation: generation.explanation,
+        manimCode: generation.manimCode,
+        videoUrl: renderResult.videoUrl || null,
+      },
+    });
 
     return NextResponse.json({
       success: renderResult.success,

@@ -1,68 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 export interface HistoryEntry {
   id: string;
   prompt: string;
   explanation: string;
   manimCode: string;
-  videoBase64: string | null;
   videoUrl: string | null;
-  timestamp: number;
-}
-
-const STORAGE_KEY = "mathviz_history";
-const MAX_HISTORY = 20;
-
-export function getHistory(): HistoryEntry[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function addToHistory(entry: Omit<HistoryEntry, "id" | "timestamp">) {
-  const history = getHistory();
-  const newEntry: HistoryEntry = {
-    ...entry,
-    id: crypto.randomUUID(),
-    timestamp: Date.now(),
-  };
-  // Don't store video in history (too large for localStorage)
-  newEntry.videoBase64 = null;
-  const updated = [newEntry, ...history].slice(0, MAX_HISTORY);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  return newEntry;
-}
-
-export function clearHistory() {
-  localStorage.removeItem(STORAGE_KEY);
+  createdAt: string;
 }
 
 interface HistoryProps {
   onSelect: (entry: HistoryEntry) => void;
   isOpen: boolean;
   onToggle: () => void;
+  refreshKey: number;
 }
 
-export default function History({ onSelect, isOpen, onToggle }: HistoryProps) {
+export default function History({ onSelect, isOpen, onToggle, refreshKey }: HistoryProps) {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    setEntries(getHistory());
+  const fetchHistory = useCallback(async () => {
+    try {
+      const res = await fetch("/api/history");
+      if (res.ok) {
+        const data = await res.json();
+        setEntries(data.entries);
+      }
+    } catch {
+      // History fetch is non-critical
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const handleClear = () => {
-    clearHistory();
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory, refreshKey]);
+
+  const handleClear = async () => {
+    await fetch("/api/history/clear", { method: "DELETE" });
     setEntries([]);
   };
 
-  const formatDate = (ts: number) => {
-    const d = new Date(ts);
+  const formatDate = (iso: string) => {
+    const d = new Date(iso);
     const now = new Date();
     const diff = now.getTime() - d.getTime();
     const minutes = Math.floor(diff / 60000);
@@ -110,7 +94,16 @@ export default function History({ onSelect, isOpen, onToggle }: HistoryProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {entries.length === 0 ? (
+          {loading ? (
+            <div className="p-4 space-y-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full mb-2" />
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+                </div>
+              ))}
+            </div>
+          ) : entries.length === 0 ? (
             <p className="p-4 text-sm text-gray-400 dark:text-gray-500">
               No visualizations yet. Generate one to see it here.
             </p>
@@ -129,7 +122,7 @@ export default function History({ onSelect, isOpen, onToggle }: HistoryProps) {
                       {entry.prompt}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
-                      {formatDate(entry.timestamp)}
+                      {formatDate(entry.createdAt)}
                     </p>
                   </button>
                 </li>
