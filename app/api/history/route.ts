@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       select: { id: true },
     });
     await prisma.historyEntry.deleteMany({
-      where: { id: { in: oldest.map((e) => e.id) } },
+      where: { id: { in: oldest.map((e: { id: string }) => e.id) } },
     });
   }
 
