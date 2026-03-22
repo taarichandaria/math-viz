@@ -130,29 +130,27 @@ export default function Home() {
       />
 
       <main className="flex-1 min-w-0">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Header */}
-          <header className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+          {/* Header bar */}
+          <header className="sticky top-0 z-20 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">
                 MathViz
               </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Describe a math concept, get an animation + explanation
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <DarkModeToggle />
-              <UserMenu />
+              <div className="flex items-center gap-2">
+                <DarkModeToggle />
+                <UserMenu />
+              </div>
             </div>
           </header>
 
-          {/* Input */}
-          <InputPanel onGenerate={handleGenerate} isLoading={isLoading} />
+          {/* Input — compact when results are showing */}
+          <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${phase === "done" && result ? "py-4" : "py-8"}`}>
+            <InputPanel onGenerate={handleGenerate} isLoading={isLoading} />
+          </div>
 
           {/* Loading */}
           {isLoading && (
-            <div className="mt-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
               <LoadingState
                 phase={phase as "generating" | "rendering" | "retrying"}
                 retryCount={retryCount}
@@ -162,18 +160,20 @@ export default function Home() {
 
           {/* Error */}
           {phase === "error" && error && (
-            <div className="mt-8 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-medium text-red-800 dark:text-red-300">
-                    Generation failed
-                  </p>
-                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                    {error}
-                  </p>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-red-800 dark:text-red-300">
+                      Generation failed
+                    </p>
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                      {error}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -181,8 +181,8 @@ export default function Home() {
 
           {/* Results */}
           {phase === "done" && result && (
-            <div className="mt-8 space-y-6">
-              {/* Render error warning (but still show explanation) */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 space-y-4">
+              {/* Render error warning */}
               {result.renderError && (
                 <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
                   <div className="flex items-start gap-3">
@@ -201,19 +201,19 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Video + Explanation side by side */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {(result.videoBase64 || result.videoUrl) && (
-                  <VideoPlayer
-                    videoBase64={result.videoBase64}
-                    videoUrl={result.videoUrl}
-                  />
-                )}
-                <Explanation content={result.explanation} />
-              </div>
+              {/* Video — full width, prominent */}
+              {(result.videoBase64 || result.videoUrl) && (
+                <VideoPlayer
+                  videoBase64={result.videoBase64}
+                  videoUrl={result.videoUrl}
+                />
+              )}
 
-              {/* Code viewer */}
-              <CodeViewer code={result.manimCode} />
+              {/* Explanation + Code side by side below the video */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Explanation content={result.explanation} />
+                <CodeViewer code={result.manimCode} />
+              </div>
 
               {/* Retry info */}
               {result.retries > 0 && (
@@ -224,7 +224,6 @@ export default function Home() {
               )}
             </div>
           )}
-        </div>
       </main>
     </div>
   );
