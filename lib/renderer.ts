@@ -26,7 +26,7 @@ export async function renderManimCode(code: string): Promise<RenderResult> {
     method: "POST",
     headers,
     body: JSON.stringify({ code }),
-    signal: AbortSignal.timeout(55_000), // 55s timeout to fit within Vercel limits
+    signal: AbortSignal.timeout(50_000), // 50s timeout to fit within Vercel 60s limit
   });
 
   if (!response.ok) {

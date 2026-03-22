@@ -82,7 +82,7 @@ export default function Home() {
       }
 
       const genData = await genResponse.json();
-      let { manimCode, explanation } = genData;
+      const { manimCode, explanation } = genData;
 
       // Step 2: Render the Manim code
       setPhase("rendering");
@@ -90,7 +90,7 @@ export default function Home() {
       const renderResponse = await fetch("/api/render", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ manimCode, prompt }),
+        body: JSON.stringify({ manimCode }),
       });
 
       if (!renderResponse.ok) {
@@ -100,15 +100,6 @@ export default function Home() {
 
       const renderData = await renderResponse.json();
 
-      // If the renderer retried with fixed code, use the updated values
-      if (renderData.retried && renderData.manimCode) {
-        manimCode = renderData.manimCode;
-        if (renderData.explanation) {
-          explanation = renderData.explanation;
-        }
-        setRetryCount(1);
-      }
-
       setResult({
         success: renderData.success,
         videoBase64: renderData.videoBase64 || null,
@@ -116,7 +107,7 @@ export default function Home() {
         explanation,
         manimCode,
         renderError: renderData.renderError || null,
-        retries: renderData.retried ? 1 : 0,
+        retries: 0,
       });
       setPhase("done");
 

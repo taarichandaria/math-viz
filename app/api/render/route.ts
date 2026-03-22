@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { renderManimCode } from "@/lib/renderer";
-import { retryWithError } from "@/lib/claude";
 
 export const maxDuration = 60;
 
 interface RenderRequest {
   manimCode: string;
-  prompt?: string;
-  model?: "claude-sonnet-4-20250514" | "claude-opus-4-0-20250514";
 }
 
 export async function POST(req: NextRequest) {
@@ -21,40 +18,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let renderResult = await renderManimCode(body.manimCode);
-
-    // If rendering fails and we have the original prompt, try one retry via Claude
-    if (!renderResult.success && body.prompt && process.env.ANTHROPIC_API_KEY) {
-      try {
-        const model = body.model || "claude-sonnet-4-20250514";
-        const fixed = await retryWithError(
-          body.manimCode,
-          renderResult.error || "Unknown rendering error",
-          body.prompt,
-          model
-        );
-        renderResult = await renderManimCode(fixed.manimCode);
-
-        return NextResponse.json({
-          success: renderResult.success,
-          videoBase64: renderResult.videoBase64 || null,
-          videoUrl: renderResult.videoUrl || null,
-          manimCode: fixed.manimCode,
-          explanation: fixed.explanation,
-          renderError: renderResult.success ? null : renderResult.error,
-          retried: true,
-        });
-      } catch {
-        // Retry failed, return original error
-      }
-    }
+    const renderResult = await renderManimCode(body.manimCode);
 
     return NextResponse.json({
       success: renderResult.success,
       videoBase64: renderResult.videoBase64 || null,
       videoUrl: renderResult.videoUrl || null,
       renderError: renderResult.success ? null : renderResult.error,
-      retried: false,
     });
   } catch (error) {
     const message =
