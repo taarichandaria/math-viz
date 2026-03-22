@@ -9,7 +9,7 @@ interface CodeViewerProps {
 }
 
 export default function CodeViewer({ code }: CodeViewerProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [copied, setCopied] = useState(false);
 
   if (!code) return null;
@@ -95,7 +95,7 @@ export default function CodeViewer({ code }: CodeViewerProps) {
               margin: 0,
               borderRadius: 0,
               fontSize: "0.8125rem",
-              maxHeight: "400px",
+              maxHeight: "50vh",
             }}
             showLineNumbers
           >
