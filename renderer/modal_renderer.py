@@ -33,6 +33,17 @@ manim_image = (
         "manim==0.18.1",
         "fastapi[standard]",
     )
+    .run_commands(
+        # Pre-warm LaTeX: compile common TeX packages so format files are
+        # baked into the container image, avoiding first-run latency.
+        "python3 -c '"
+        "from manim import MathTex, Tex, Text; "
+        "MathTex(r\"\\\\int_0^1 x^2 \\\\, dx = \\\\frac{1}{3}\"); "
+        "MathTex(r\"\\\\sum_{n=1}^{\\\\infty} \\\\frac{1}{n^2}\"); "
+        "Tex(r\"Hello\"); "
+        "Text(\"warmup\")"
+        "' || true",
+    )
 )
 
 app = modal.App("mathviz-renderer", image=manim_image)
@@ -59,6 +70,19 @@ def render(request: dict):
 
         with open(scene_path, "w") as f:
             f.write(code)
+
+        # Share a persistent TeX cache across renders on warm containers.
+        # Manim stores compiled LaTeX SVGs in {media_dir}/Tex/ using
+        # content-addressed filenames, so concurrent writes are safe.
+        tex_cache = "/tmp/manim_tex_cache"
+        os.makedirs(tex_cache, exist_ok=True)
+        os.symlink(tex_cache, os.path.join(tmpdir, "Tex"))
+
+        # Use ffmpeg ultrafast preset — trades file size for encoding speed.
+        cfg_path = os.path.join(tmpdir, "manim.cfg")
+        with open(cfg_path, "w") as f:
+            f.write("[CLI]\n")
+            f.write("ffmpeg_extra_args = -preset ultrafast\n")
 
         try:
             result = subprocess.run(

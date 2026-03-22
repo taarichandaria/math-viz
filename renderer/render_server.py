@@ -51,6 +51,19 @@ async def render(request: RenderRequest):
         with open(scene_path, "w") as f:
             f.write(request.code)
 
+        # Share a persistent TeX cache across renders on warm containers.
+        # Manim stores compiled LaTeX SVGs in {media_dir}/Tex/ using
+        # content-addressed filenames, so concurrent writes are safe.
+        tex_cache = "/tmp/manim_tex_cache"
+        os.makedirs(tex_cache, exist_ok=True)
+        os.symlink(tex_cache, os.path.join(tmpdir, "Tex"))
+
+        # Use ffmpeg ultrafast preset — trades file size for encoding speed.
+        cfg_path = os.path.join(tmpdir, "manim.cfg")
+        with open(cfg_path, "w") as f:
+            f.write("[CLI]\n")
+            f.write("ffmpeg_extra_args = -preset ultrafast\n")
+
         # Run Manim
         try:
             result = subprocess.run(
