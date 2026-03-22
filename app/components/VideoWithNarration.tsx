@@ -46,7 +46,16 @@ export default function VideoWithNarration({
   const narrationRef = useRef<HTMLDivElement>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [activeIndex, setActiveIndex] = useState(0);
-  const segments = parseNarration(explanation);
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
+
+  const allSegments = parseNarration(explanation);
+  // Once we know the actual video duration, filter out any narration segments
+  // whose timestamps exceed the video length (Claude can't know the exact
+  // duration when generating, so it sometimes writes narration beyond the end).
+  const segments =
+    videoDuration != null
+      ? allSegments.filter((s) => s.time <= videoDuration)
+      : allSegments;
 
   const src = videoBase64
     ? `data:video/mp4;base64,${videoBase64}`
@@ -73,6 +82,16 @@ export default function VideoWithNarration({
     video.addEventListener("timeupdate", handleTimeUpdate);
     return () => video.removeEventListener("timeupdate", handleTimeUpdate);
   }, [handleTimeUpdate]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const handleLoadedMetadata = () => setVideoDuration(video.duration);
+    video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    // In case the video is already loaded when this effect runs
+    if (video.readyState >= 1) setVideoDuration(video.duration);
+    return () => video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+  }, [src]);
 
   // Auto-scroll narration to active segment
   useEffect(() => {
