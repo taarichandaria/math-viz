@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isAuthConfigured } from "@/lib/runtime-config";
+import { createDataVideoUrl } from "@/lib/video";
 
 const MAX_HISTORY = 50;
 
@@ -24,7 +25,6 @@ export async function GET() {
       prompt: true,
       explanation: true,
       manimCode: true,
-      videoUrl: true,
       createdAt: true,
     },
   });
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { prompt, explanation, manimCode, videoUrl } = body;
+  const { prompt, explanation, manimCode, videoUrl, videoBase64 } = body;
 
   if (!prompt || !explanation || !manimCode) {
     return NextResponse.json(
@@ -52,13 +52,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const normalizedVideoUrl =
+    typeof videoUrl === "string" && videoUrl.trim().length > 0
+      ? videoUrl.trim()
+      : null;
+  const normalizedVideoBase64 =
+    typeof videoBase64 === "string" && videoBase64.trim().length > 0
+      ? videoBase64.trim()
+      : null;
+  const storedVideoUrl = normalizedVideoBase64
+    ? createDataVideoUrl(normalizedVideoBase64)
+    : normalizedVideoUrl;
+
   const entry = await prisma.historyEntry.create({
     data: {
       userId: session.user.id,
       prompt,
       explanation,
       manimCode,
-      videoUrl: videoUrl || null,
+      videoUrl: storedVideoUrl,
     },
   });
 
@@ -78,5 +90,16 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({ entry }, { status: 201 });
+  return NextResponse.json(
+    {
+      entry: {
+        ...entry,
+        videoUrl:
+          storedVideoUrl
+            ? `/api/history/${entry.id}/video`
+            : null,
+      },
+    },
+    { status: 201 }
+  );
 }

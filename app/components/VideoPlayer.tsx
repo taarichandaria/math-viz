@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useVideoSource } from "./useVideoSource";
 
 interface VideoPlayerProps {
   videoBase64: string | null;
@@ -13,10 +14,7 @@ export default function VideoPlayer({
 }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
-
-  const src = videoBase64
-    ? `data:video/mp4;base64,${videoBase64}`
-    : videoUrl || "";
+  const src = useVideoSource(videoBase64, videoUrl);
 
   if (!src) return null;
 
@@ -37,12 +35,14 @@ export default function VideoPlayer({
   return (
     <div className="bg-black rounded-xl overflow-hidden shadow-lg">
       <video
+        key={src}
         ref={videoRef}
         src={src}
         controls
         autoPlay
         className="w-full aspect-video"
         playsInline
+        preload="metadata"
       />
       <div className="flex items-center justify-between px-4 py-2 bg-gray-900">
         <div className="flex items-center gap-1">

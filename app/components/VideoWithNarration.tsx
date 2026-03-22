@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
+import { useVideoSource } from "./useVideoSource";
 
 interface NarrationSegment {
   time: number; // seconds
@@ -57,9 +58,7 @@ export default function VideoWithNarration({
       ? allSegments.filter((s) => s.time <= videoDuration)
       : allSegments;
 
-  const src = videoBase64
-    ? `data:video/mp4;base64,${videoBase64}`
-    : videoUrl || "";
+  const src = useVideoSource(videoBase64, videoUrl);
 
   const handleTimeUpdate = useCallback(() => {
     if (!videoRef.current) return;
@@ -92,6 +91,11 @@ export default function VideoWithNarration({
     if (video.readyState >= 1) setVideoDuration(video.duration);
     return () => video.removeEventListener("loadedmetadata", handleLoadedMetadata);
   }, [src]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+    setVideoDuration(null);
+  }, [src, explanation]);
 
   // Auto-scroll narration to active segment
   useEffect(() => {
@@ -138,12 +142,14 @@ export default function VideoWithNarration({
       <div className="flex-1 min-w-0 flex flex-col">
         <div className="bg-black rounded-xl overflow-hidden shadow-lg flex-1 flex flex-col">
           <video
+            key={src}
             ref={videoRef}
             src={src}
             controls
             autoPlay
             className="w-full flex-1 object-contain bg-black"
             playsInline
+            preload="metadata"
           />
           <div className="flex items-center justify-between px-4 py-2 bg-gray-900 shrink-0">
             <div className="flex items-center gap-1">

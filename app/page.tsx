@@ -109,12 +109,36 @@ export default function Home() {
       const finalCode = renderData.manimCode || manimCode;
       const finalExplanation = renderData.explanation || explanation;
       const retries = renderData.retries || 0;
+      let persistedVideoUrl: string | null = null;
+
+      if (session?.user) {
+        try {
+          const historyResponse = await fetch("/api/history", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt,
+              explanation: finalExplanation,
+              manimCode: finalCode,
+              videoBase64: renderData.videoBase64 || null,
+              videoUrl: renderData.videoUrl || null,
+            }),
+          });
+
+          if (historyResponse.ok) {
+            const historyData = await historyResponse.json();
+            persistedVideoUrl = historyData.entry?.videoUrl || null;
+          }
+        } catch {
+          // History persistence is best-effort
+        }
+      }
 
       setRetryCount(retries);
       setResult({
         success: renderData.success,
         videoBase64: renderData.videoBase64 || null,
-        videoUrl: renderData.videoUrl || null,
+        videoUrl: persistedVideoUrl || renderData.videoUrl || null,
         explanation: finalExplanation,
         manimCode: finalCode,
         renderError: renderData.renderError || null,
@@ -127,20 +151,52 @@ export default function Home() {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setPhase("error");
     }
-  }, []);
+  }, [session?.user]);
 
-  const handleHistorySelect = useCallback((entry: HistoryEntry) => {
-    setResult({
-      success: true,
-      videoBase64: null,
-      videoUrl: entry.videoUrl,
-      explanation: entry.explanation,
-      manimCode: entry.manimCode,
-      renderError: null,
-      retries: 0,
-    });
-    setPhase("done");
-    setError(null);
+  const handleHistorySelect = useCallback(async (entry: HistoryEntry) => {
+    try {
+      const historyResponse = await fetch(`/api/history/${entry.id}`);
+
+      if (historyResponse.ok) {
+        const historyData = await historyResponse.json();
+        const selectedEntry = historyData.entry || entry;
+
+        setResult({
+          success: true,
+          videoBase64: null,
+          videoUrl: selectedEntry.videoUrl || null,
+          explanation: selectedEntry.explanation,
+          manimCode: selectedEntry.manimCode,
+          renderError: null,
+          retries: 0,
+        });
+      } else {
+        setResult({
+          success: true,
+          videoBase64: null,
+          videoUrl: null,
+          explanation: entry.explanation,
+          manimCode: entry.manimCode,
+          renderError: null,
+          retries: 0,
+        });
+      }
+
+      setPhase("done");
+      setError(null);
+    } catch {
+      setResult({
+        success: true,
+        videoBase64: null,
+        videoUrl: null,
+        explanation: entry.explanation,
+        manimCode: entry.manimCode,
+        renderError: null,
+        retries: 0,
+      });
+      setPhase("done");
+      setError(null);
+    }
   }, []);
 
   const isLoading = phase === "generating" || phase === "rendering" || phase === "retrying";
@@ -148,6 +204,13 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <main>
+          <History
+            onSelect={handleHistorySelect}
+            isOpen={historyOpen}
+            onToggle={() => setHistoryOpen((open) => !open)}
+            refreshKey={refreshKey}
+          />
+
           {/* Header bar */}
           <header className="sticky top-0 z-20 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">

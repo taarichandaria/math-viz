@@ -7,7 +7,6 @@ export interface HistoryEntry {
   prompt: string;
   explanation: string;
   manimCode: string;
-  videoUrl: string | null;
   createdAt: string;
 }
 
@@ -23,6 +22,7 @@ export default function History({ onSelect, isOpen, onToggle, refreshKey }: Hist
   const [loading, setLoading] = useState(true);
 
   const fetchHistory = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await fetch("/api/history");
       if (res.ok) {
