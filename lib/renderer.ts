@@ -22,12 +22,23 @@ export async function renderManimCode(code: string): Promise<RenderResult> {
     headers["Authorization"] = `Bearer ${RENDERER_API_KEY}`;
   }
 
-  const response = await fetch(RENDER_ENDPOINT, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ code }),
-    signal: AbortSignal.timeout(50_000), // 50s timeout to fit within Vercel 60s limit
-  });
+  let response: Response;
+  try {
+    response = await fetch(RENDER_ENDPOINT, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ code }),
+      signal: AbortSignal.timeout(50_000), // 50s timeout to fit within Vercel 60s limit
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      return {
+        success: false,
+        error: "Rendering timed out — the animation may be too complex. Try a simpler prompt.",
+      };
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     const errorBody = await response.text();

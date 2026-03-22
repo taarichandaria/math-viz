@@ -12,7 +12,7 @@ MANIM CODE RULES:
 - Always use \`from manim import *\`
 - Define exactly ONE Scene subclass
 - The scene class must be named \`MainScene\`
-- Target 1080p resolution (config.pixel_width = 1920, config.pixel_height = 1080)
+- Target 720p resolution (config.pixel_width = 1280, config.pixel_height = 720)
 - Aim for around 60 seconds of animation, but longer is fine if the concept requires it
 - Use self.play() for all animations (never self.add() for things that should animate)
 - Use LaTeX via MathTex() for all mathematical notation

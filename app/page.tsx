@@ -87,18 +87,23 @@ export default function Home() {
       // Step 2: Render the Manim code
       setPhase("rendering");
 
-      const renderResponse = await fetch("/api/render", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ manimCode }),
-      });
+      let renderData = { success: false, videoBase64: null, videoUrl: null, renderError: null as string | null };
+      try {
+        const renderResponse = await fetch("/api/render", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ manimCode }),
+        });
 
-      if (!renderResponse.ok) {
-        const errData = await renderResponse.json().catch(() => ({}));
-        throw new Error(errData.error || `Render error: ${renderResponse.status}`);
+        if (renderResponse.ok) {
+          renderData = await renderResponse.json();
+        } else {
+          const errData = await renderResponse.json().catch(() => ({}));
+          renderData.renderError = errData.error || `Render error: ${renderResponse.status}`;
+        }
+      } catch {
+        renderData.renderError = "Rendering timed out — the animation may be too complex.";
       }
-
-      const renderData = await renderResponse.json();
 
       setResult({
         success: renderData.success,
