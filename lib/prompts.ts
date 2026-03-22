@@ -28,11 +28,18 @@ MANIM CODE RULES:
 - Always specify font_size for Text() objects to ensure readability
 
 EXPLANATION RULES:
+- Write as timestamped narration that syncs with the animation, like a narrator describing what's on screen
+- Each line must start with a timestamp in [M:SS] format, followed by the narration text
+- Timestamps should correspond to when each visual moment appears in the animation
 - Write at the level of an undergraduate math student
-- Use LaTeX notation inline with $...$ and display with $$...$$
-- Structure: intuition first, then formal definition, then connection to animation
-- Keep it under 500 words
-- Reference specific visual moments (e.g., "As you can see in the animation when the blue region shrinks...")
+- Use LaTeX notation inline with $...$ where helpful
+- Be concise and conversational — like a voiceover, not a textbook
+- Cover the full duration of the animation with narration segments
+- Example format:
+  [0:00] We start by drawing the coordinate axes and plotting our function f(x) = x².
+  [0:05] Let's pick a specific point — here at x = 3, where f(3) = 9.
+  [0:12] Now, the epsilon-delta definition says: for any epsilon neighborhood around 9...
+  [0:20] ...we can find a delta neighborhood around 3 such that f maps delta into epsilon.
 
 MATH DOMAIN COVERAGE:
 You should handle: Calculus, Linear Algebra, Real Analysis, Abstract Algebra, Topology, Probability, Differential Equations, Number Theory, Complex Analysis, and more.`;

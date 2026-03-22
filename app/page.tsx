@@ -3,8 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import InputPanel from "./components/InputPanel";
-import VideoPlayer from "./components/VideoPlayer";
-import Explanation from "./components/Explanation";
+import VideoWithNarration from "./components/VideoWithNarration";
 import CodeViewer from "./components/CodeViewer";
 import LoadingState from "./components/LoadingState";
 import History, { type HistoryEntry } from "./components/History";
@@ -194,19 +193,17 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Video — full width, prominent */}
+              {/* Video with synced narration */}
               {(result.videoBase64 || result.videoUrl) && (
-                <VideoPlayer
+                <VideoWithNarration
                   videoBase64={result.videoBase64}
                   videoUrl={result.videoUrl}
+                  explanation={result.explanation}
                 />
               )}
 
-              {/* Explanation + Code side by side below the video */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <Explanation content={result.explanation} />
-                <CodeViewer code={result.manimCode} />
-              </div>
+              {/* Code viewer — collapsed below */}
+              <CodeViewer code={result.manimCode} />
 
               {/* Retry info */}
               {result.retries > 0 && (
