@@ -38,7 +38,7 @@ manim_image = (
 app = modal.App("mathviz-renderer", image=manim_image)
 
 
-@app.function(timeout=120, memory=2048)
+@app.function(timeout=120, memory=2048, keep_warm=1)
 @modal.web_endpoint(method="POST")
 def render(request: dict):
     """Receive Manim code, render it, return base64 video."""
