@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { renderManimCode } from "@/lib/renderer";
 import { retryWithError } from "@/lib/claude";
+import { validateManimCode } from "@/lib/validate";
 
 export const maxDuration = 300;
 
@@ -9,6 +10,20 @@ const MAX_RETRIES = 2;
 interface RenderRequest {
   manimCode: string;
   prompt?: string;
+}
+
+async function tryFixCode(
+  code: string,
+  error: string,
+  prompt: string | undefined
+): Promise<{ code: string; explanation: string | null } | null> {
+  if (!prompt) return null;
+  try {
+    const fixed = await retryWithError(code, error, prompt);
+    return { code: fixed.manimCode, explanation: fixed.explanation };
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -28,6 +43,22 @@ export async function POST(req: NextRequest) {
     let explanation: string | null = null;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      // Pre-render validation — catch obvious issues without burning a render cycle
+      const validation = validateManimCode(currentCode);
+      if (!validation.valid) {
+        lastError = "Code validation failed:\n" + validation.errors.join("\n");
+
+        if (attempt >= MAX_RETRIES) break;
+
+        const fixed = await tryFixCode(currentCode, lastError, body.prompt);
+        if (!fixed) break;
+        currentCode = fixed.code;
+        explanation = fixed.explanation;
+        retries++;
+        continue;
+      }
+
+      // Render
       const renderResult = await renderManimCode(currentCode);
 
       if (renderResult.success) {
@@ -45,29 +76,17 @@ export async function POST(req: NextRequest) {
       lastError = renderResult.error || "Unknown render error";
 
       // Don't retry on timeout — the animation is likely too complex
-      if (lastError.includes("timed out")) {
-        break;
-      }
+      if (lastError.includes("timed out")) break;
 
-      // Don't retry if we've exhausted attempts or have no prompt for context
-      if (attempt >= MAX_RETRIES || !body.prompt) {
-        break;
-      }
+      // Don't retry if we've exhausted attempts
+      if (attempt >= MAX_RETRIES) break;
 
       // Ask Claude to fix the code
-      try {
-        const fixed = await retryWithError(
-          currentCode,
-          lastError,
-          body.prompt
-        );
-        currentCode = fixed.manimCode;
-        explanation = fixed.explanation;
-        retries++;
-      } catch {
-        // If Claude fails to fix it, return the original render error
-        break;
-      }
+      const fixed = await tryFixCode(currentCode, lastError, body.prompt);
+      if (!fixed) break;
+      currentCode = fixed.code;
+      explanation = fixed.explanation;
+      retries++;
     }
 
     return NextResponse.json({
