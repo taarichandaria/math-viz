@@ -1,275 +1,63 @@
-# MathViz — Deployment Guide
+# MathViz
 
-Describe a math concept in plain English → get a Manim animation + written explanation.
+Describe a math concept in plain English and get an animated video explanation powered by [Manim](https://www.manim.community/) and Claude.
 
----
-
-## Architecture (What You're Deploying)
-
-There are **two things** to deploy:
-
-1. **Next.js frontend** — the website (Input box, video player, explanation, etc.)
-2. **Manim renderer** — a Python server that runs Manim code and returns videos
-
-```
-[User's Browser] → [Next.js on Vercel] → [Claude API] → (code + explanation)
-                                        → [Manim Renderer] → (video)
-```
+![Next.js](https://img.shields.io/badge/Next.js-15-black) ![Claude](https://img.shields.io/badge/Claude-Anthropic-blueviolet) ![Manim](https://img.shields.io/badge/Manim-Community-blue)
 
 ---
 
-## Prerequisites
+## How It Works
 
-You need:
+1. **You describe a concept** — e.g. "Explain the intuition behind eigenvalues"
+2. **Claude generates Manim code + a narration** — a complete Python animation script and a timestamped written explanation
+3. **The renderer executes the Manim code** — producing an MP4 video
+4. **You watch the result** — the video plays in-browser with the narration synced alongside it
 
-- [ ] An **Anthropic API key** — get one at https://console.anthropic.com/
-- [ ] **Docker Desktop** installed — https://www.docker.com/products/docker-desktop/
-- [ ] A **Vercel** account (free) — https://vercel.com/signup
-- [ ] A server to run the Manim renderer (options below)
+```
+[Browser] → [Next.js API] → [Claude] → Manim code + explanation
+                           → [Renderer] → MP4 video
+```
+
+The system covers topics across Calculus, Linear Algebra, Topology, Differential Equations, Number Theory, and more.
 
 ---
 
-## Step 1: Get Your Anthropic API Key
+## Features
 
-1. Go to https://console.anthropic.com/
-2. Sign up or log in
-3. Go to **API Keys** in the sidebar
-4. Click **Create Key**
-5. Copy it — it looks like `sk-ant-api03-...`
-6. **Save it somewhere safe.** You'll need it in Step 3.
-
----
-
-## Step 2: Deploy the Manim Renderer
-
-The renderer is a Python server that takes Manim code, runs it, and returns a video. It needs Linux + Cairo + FFmpeg + LaTeX.
-
-### Option A: Deploy to Modal.com (Easiest — No Docker Required)
-
-Modal handles all the infrastructure for you. No Docker, no servers.
-
-1. Install Modal:
-```bash
-pip install modal
-```
-
-2. Create a Modal account and authenticate:
-```bash
-modal setup
-```
-
-3. Deploy the renderer:
-```bash
-modal deploy renderer/modal_renderer.py
-```
-
-4. Modal prints your endpoint URLs. Copy the `render` endpoint URL — it looks like:
-```
-https://YOUR_USERNAME--mathviz-renderer-render.modal.run
-```
-
-Set `RENDERER_URL` to this exact URL. The app auto-detects Modal URLs and handles routing correctly.
-
-Test it works:
-```bash
-curl https://YOUR_USERNAME--mathviz-renderer-health.modal.run
-# Should return: {"status":"ok"}
-```
-
-> **Note:** Modal auto-scales to zero when idle and cold-starts in ~10-20s. First render after idle will be slower.
-
-### Option B: Run Locally with Docker (For Local Testing)
-
-```bash
-# From the project root
-cd renderer
-
-# Build the Docker image (~2-5 min first time, downloads ~2GB)
-docker build -t mathviz-renderer .
-
-# Run it
-docker run -p 8000:8000 mathviz-renderer
-```
-
-Test it works:
-```bash
-curl http://localhost:8000/health
-# Should return: {"status":"ok"}
-```
-
-Your renderer URL is: `http://localhost:8000`
-
-### Option C: Deploy to Railway.app
-
-Railway makes it dead simple to deploy Docker containers.
-
-1. Go to https://railway.app/ and sign up (free tier available)
-2. Click **New Project** → **Deploy from GitHub repo**
-3. Point it to your repo, set the **Root Directory** to `renderer`
-4. Railway will auto-detect the Dockerfile and build it
-5. Go to **Settings** → **Networking** → **Generate Domain**
-6. Copy the public URL — it'll look like `https://mathviz-renderer-production-xxxx.up.railway.app`
-
-That's your renderer URL.
-
-### Option D: Deploy to Fly.io
-
-```bash
-# Install flyctl: https://fly.io/docs/flyctl/install/
-cd renderer
-
-# First time only
-fly launch --name mathviz-renderer --no-deploy
-# When asked: pick a region close to you, say YES to Dockerfile, NO to database
-
-# Deploy
-fly deploy
-
-# Get your URL
-fly status
-# Your URL is: https://mathviz-renderer.fly.dev
-```
-
-### Option E: Deploy to a VPS (DigitalOcean, Hetzner, etc.)
-
-```bash
-# SSH into your server
-ssh user@your-server-ip
-
-# Install Docker if not installed
-curl -fsSL https://get.docker.com | sh
-
-# Clone your repo
-git clone https://github.com/YOUR_USERNAME/mathviz.git
-cd mathviz/renderer
-
-# Build and run
-docker build -t mathviz-renderer .
-docker run -d -p 8000:8000 --restart unless-stopped mathviz-renderer
-```
-
-Your renderer URL is: `http://your-server-ip:8000`
-
-> **Tip:** Put it behind a reverse proxy (Caddy/nginx) with HTTPS for production.
+- **AI-generated animations** — Claude writes Manim code tailored to the concept, with automatic retry on render failures
+- **Synchronized narration** — timestamped explanations that follow along with the animation
+- **LaTeX rendering** — mathematical notation rendered inline via KaTeX
+- **Code viewer** — inspect the generated Manim source code for any visualization
+- **User accounts & history** — sign in to save and revisit past generations
+- **Graceful error handling** — automatic retries, resolution fallbacks, and clear error messages when renders fail
 
 ---
 
-## Step 3: Deploy the Frontend to Vercel
+## Architecture
 
-### 3a. Push your code to GitHub
-
-```bash
-# From the project root (not the renderer folder)
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/YOUR_USERNAME/mathviz.git
-git push -u origin main
-```
-
-### 3b. Deploy on Vercel
-
-1. Go to https://vercel.com/new
-2. Click **Import** next to your `mathviz` repository
-3. Vercel auto-detects Next.js — leave the defaults
-4. **Expand "Environment Variables"** and add these:
-
-| Variable | Value |
-|----------|-------|
-| `ANTHROPIC_API_KEY` | `sk-ant-api03-...` (your key from Step 1) |
-| `RENDERER_URL` | The URL from Step 2 (e.g. `https://mathviz-renderer-production-xxxx.up.railway.app`) |
-
-5. Click **Deploy**
-6. Wait ~1 minute. Vercel gives you a URL like `https://mathviz-xxxx.vercel.app`
-
-**That's it. You're live.**
+| Component | Tech | Purpose |
+|-----------|------|---------|
+| Frontend | Next.js 15, React 19, Tailwind CSS | UI, video player, narration display |
+| AI | Anthropic Claude API | Generates Manim code and written explanations |
+| Renderer | Python (FastAPI) + Manim Community Edition | Executes Manim code and returns MP4 videos |
+| Auth | NextAuth.js | User accounts and session management |
+| Database | SQLite via Prisma | Stores user history |
 
 ---
 
-## Running Everything Locally (Development)
+## Project Structure
 
-If you just want to run it on your machine:
-
-```bash
-# 1. Clone and install
-git clone https://github.com/YOUR_USERNAME/mathviz.git
-cd mathviz
-npm install
-
-# 2. Create .env.local
-cp .env.local.example .env.local
-# Edit .env.local and add your ANTHROPIC_API_KEY
-
-# 3. Start the Manim renderer (in a separate terminal)
-cd renderer
-docker build -t mathviz-renderer .
-docker run -p 8000:8000 mathviz-renderer
-
-# 4. Start the frontend (in another terminal, from project root)
-npm run dev
 ```
-
-Open http://localhost:3000 and you're good.
-
----
-
-## Troubleshooting
-
-### "ANTHROPIC_API_KEY is not configured"
-→ You forgot to set the environment variable. Check `.env.local` (local) or Vercel dashboard (production).
-
-### "Renderer returned 500" or "fetch failed"
-→ The Manim renderer isn't running or the URL is wrong. Test it:
-```bash
-curl YOUR_RENDERER_URL/health
+app/                  → Next.js pages and API routes
+  api/generate/       → Main generation endpoint
+  history/            → Past visualizations
+lib/
+  claude.ts           → Claude API integration and prompt construction
+  prompts.ts          → System prompts for Manim code generation
+  renderer.ts         → Client for the Manim rendering service
+prisma/               → Database schema
+renderer/
+  render_server.py    → FastAPI server that executes Manim code
+  modal_renderer.py   → Modal.com deployment variant
+  Dockerfile          → Container image with Manim + dependencies
 ```
-If that doesn't return `{"status":"ok"}`, the renderer is down.
-
-### "Animation couldn't be rendered"
-→ This is expected ~20-30% of the time. The AI-generated Manim code sometimes has bugs. The app retries twice automatically. Click Generate again for a new attempt.
-
-### Docker build fails on ARM Mac (M1/M2/M3)
-→ The Manim Docker image supports ARM. If you still hit issues:
-```bash
-docker build --platform linux/amd64 -t mathviz-renderer .
-docker run --platform linux/amd64 -p 8000:8000 mathviz-renderer
-```
-
-### Vercel deploy fails with "Function too large"
-→ This shouldn't happen with the current setup, but if it does, make sure you're not accidentally including the `renderer/` folder in the Vercel build. Add to your `vercel.json`:
-```json
-{
-  "ignoreCommand": "exit 0"
-}
-```
-
-### Video takes forever / times out
-→ The renderer has a 90-second timeout. Complex animations can take a while. The system prompt tells Claude to keep animations under 60 seconds, but occasionally it generates something heavy.
-
----
-
-## Cost Estimates
-
-| Component | Cost |
-|-----------|------|
-| Vercel (frontend) | Free tier is fine for personal use |
-| Modal (renderer) | Free tier: $30/month credit. Plenty for personal use |
-| Railway (renderer) | Free tier: 500 hours/month. Plenty for personal use |
-| Claude API (Sonnet) | ~$0.01-0.03 per generation |
-| Claude API (Opus) | ~$0.10-0.30 per generation |
-
-**For personal use, expect to spend ~$1-5/month on the Claude API.**
-
----
-
-## Quick Reference
-
-| What | Where |
-|------|-------|
-| Frontend code | `app/` |
-| API route | `app/api/generate/route.ts` |
-| Claude integration | `lib/claude.ts` + `lib/prompts.ts` |
-| Renderer client | `lib/renderer.ts` |
-| Manim renderer (Docker) | `renderer/render_server.py` + `renderer/Dockerfile` |
-| Manim renderer (Modal) | `renderer/modal_renderer.py` |
-| Environment variables | `.env.local` (local) or Vercel dashboard (prod) |
