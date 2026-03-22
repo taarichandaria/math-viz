@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateVisualization, retryWithError } from "@/lib/claude";
-import { renderManimCode } from "@/lib/renderer";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { generateVisualization } from "@/lib/claude";
 import { isAuthConfigured } from "@/lib/runtime-config";
+import { auth } from "@/lib/auth";
 
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 interface GenerateRequest {
   prompt: string;
@@ -34,54 +32,11 @@ export async function POST(req: NextRequest) {
 
     const model = body.model || "claude-sonnet-4-20250514";
 
-    // Phase 1: Generate code + explanation via Claude
-    let generation = await generateVisualization(body.prompt, model);
-
-    // Phase 2: Render the Manim code
-    let renderResult = await renderManimCode(generation.manimCode);
-
-    // Retry loop: if rendering fails, send error back to Claude for a fix
-    const MAX_RETRIES = 2;
-    let retryCount = 0;
-
-    while (!renderResult.success && retryCount < MAX_RETRIES) {
-      retryCount++;
-
-      try {
-        generation = await retryWithError(
-          generation.manimCode,
-          renderResult.error || "Unknown rendering error",
-          body.prompt,
-          model
-        );
-        renderResult = await renderManimCode(generation.manimCode);
-      } catch {
-        // If the retry itself fails, break and show what we have
-        break;
-      }
-    }
-
-    // Save to history automatically
-    if (prisma && session?.user?.id) {
-      await prisma.historyEntry.create({
-        data: {
-          userId: session.user.id,
-          prompt: body.prompt,
-          explanation: generation.explanation,
-          manimCode: generation.manimCode,
-          videoUrl: renderResult.videoUrl || null,
-        },
-      });
-    }
+    const generation = await generateVisualization(body.prompt, model);
 
     return NextResponse.json({
-      success: renderResult.success,
-      videoBase64: renderResult.videoBase64 || null,
-      videoUrl: renderResult.videoUrl || null,
       explanation: generation.explanation,
       manimCode: generation.manimCode,
-      renderError: renderResult.success ? null : renderResult.error,
-      retries: retryCount,
     });
   } catch (error) {
     const message =

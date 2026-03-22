@@ -69,33 +69,57 @@ export default function Home() {
     setRetryCount(0);
 
     try {
-      // We can't track server-side phases from the client in a single POST,
-      // so we simulate the phase transition with a timer
-      const phaseTimer = setTimeout(() => setPhase("rendering"), 5000);
-
-      const response = await fetch("/api/generate", {
+      // Step 1: Generate code + narration via Claude
+      const genResponse = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
       });
 
-      clearTimeout(phaseTimer);
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Server error: ${response.status}`);
+      if (!genResponse.ok) {
+        const errData = await genResponse.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error: ${genResponse.status}`);
       }
 
-      const data: GenerationResult = await response.json();
+      const genData = await genResponse.json();
+      let { manimCode, explanation } = genData;
 
-      if (data.retries > 0) {
-        setRetryCount(data.retries);
+      // Step 2: Render the Manim code
+      setPhase("rendering");
+
+      const renderResponse = await fetch("/api/render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manimCode, prompt }),
+      });
+
+      if (!renderResponse.ok) {
+        const errData = await renderResponse.json().catch(() => ({}));
+        throw new Error(errData.error || `Render error: ${renderResponse.status}`);
       }
 
-      setResult(data);
+      const renderData = await renderResponse.json();
+
+      // If the renderer retried with fixed code, use the updated values
+      if (renderData.retried && renderData.manimCode) {
+        manimCode = renderData.manimCode;
+        if (renderData.explanation) {
+          explanation = renderData.explanation;
+        }
+        setRetryCount(1);
+      }
+
+      setResult({
+        success: renderData.success,
+        videoBase64: renderData.videoBase64 || null,
+        videoUrl: renderData.videoUrl || null,
+        explanation,
+        manimCode,
+        renderError: renderData.renderError || null,
+        retries: renderData.retried ? 1 : 0,
+      });
       setPhase("done");
 
-      // Trigger history refresh (server already saved the entry)
       setRefreshKey((k) => k + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
