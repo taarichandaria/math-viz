@@ -37,7 +37,7 @@ export async function generateVisualization(
 ): Promise<GenerationResult> {
   const response = await anthropic.messages.create({
     model,
-    max_tokens: 4096,
+    max_tokens: 16384,
     system: MANIM_SYSTEM_PROMPT,
     messages: [
       {
@@ -46,6 +46,10 @@ export async function generateVisualization(
       },
     ],
   });
+
+  if (response.stop_reason === "max_tokens") {
+    throw new Error("Response was too long and got cut off. Try a simpler prompt.");
+  }
 
   const content = response.content[0];
   if (content.type !== "text") {
@@ -63,7 +67,7 @@ export async function retryWithError(
 ): Promise<GenerationResult> {
   const response = await anthropic.messages.create({
     model,
-    max_tokens: 4096,
+    max_tokens: 16384,
     system: MANIM_SYSTEM_PROMPT,
     messages: [
       {
@@ -80,6 +84,10 @@ export async function retryWithError(
       },
     ],
   });
+
+  if (response.stop_reason === "max_tokens") {
+    throw new Error("Response was too long and got cut off. Try a simpler prompt.");
+  }
 
   const content = response.content[0];
   if (content.type !== "text") {
