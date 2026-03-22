@@ -62,10 +62,10 @@ export default function History({ onSelect, isOpen, onToggle, refreshKey }: Hist
 
   return (
     <>
-      {/* Toggle button */}
+      {/* Toggle button — always visible */}
       <button
         onClick={onToggle}
-        className="fixed top-4 left-4 z-50 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors lg:hidden"
+        className="fixed top-4 left-4 z-50 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
         aria-label="Toggle history"
       >
         <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,24 +73,43 @@ export default function History({ onSelect, isOpen, onToggle, refreshKey }: Hist
         </svg>
       </button>
 
-      {/* Sidebar */}
+      {/* Backdrop overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30 transition-opacity"
+          onClick={onToggle}
+        />
+      )}
+
+      {/* Slide-over panel */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 z-40 h-screen w-64 bg-white dark:bg-gray-800/95 backdrop-blur-sm border-r border-gray-200 dark:border-gray-700/50 transform transition-transform duration-200 ${
-          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        className={`fixed top-0 left-0 z-50 h-screen w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700/50 shadow-xl transform transition-transform duration-200 ease-in-out ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
         } flex flex-col`}
       >
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
             History
           </h2>
-          {entries.length > 0 && (
+          <div className="flex items-center gap-3">
+            {entries.length > 0 && (
+              <button
+                onClick={handleClear}
+                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+              >
+                Clear all
+              </button>
+            )}
             <button
-              onClick={handleClear}
-              className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+              onClick={onToggle}
+              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              aria-label="Close history"
             >
-              Clear all
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
-          )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -114,7 +133,7 @@ export default function History({ onSelect, isOpen, onToggle, refreshKey }: Hist
                   <button
                     onClick={() => {
                       onSelect(entry);
-                      if (window.innerWidth < 1024) onToggle();
+                      onToggle();
                     }}
                     className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors border-b border-gray-100 dark:border-gray-700/50"
                   >
@@ -131,14 +150,6 @@ export default function History({ onSelect, isOpen, onToggle, refreshKey }: Hist
           )}
         </div>
       </aside>
-
-      {/* Overlay for mobile */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/30 lg:hidden"
-          onClick={onToggle}
-        />
-      )}
     </>
   );
 }
