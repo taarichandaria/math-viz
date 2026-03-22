@@ -84,15 +84,15 @@ export default function Home() {
       const genData = await genResponse.json();
       const { manimCode, explanation } = genData;
 
-      // Step 2: Render the Manim code
+      // Step 2: Render the Manim code (with auto-retry on failure)
       setPhase("rendering");
 
-      let renderData = { success: false, videoBase64: null, videoUrl: null, renderError: null as string | null };
+      let renderData = { success: false, videoBase64: null, videoUrl: null, renderError: null as string | null, manimCode: null as string | null, explanation: null as string | null, retries: 0 };
       try {
         const renderResponse = await fetch("/api/render", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ manimCode }),
+          body: JSON.stringify({ manimCode, prompt }),
         });
 
         if (renderResponse.ok) {
@@ -105,14 +105,20 @@ export default function Home() {
         renderData.renderError = "Rendering timed out — the animation may be too complex.";
       }
 
+      // Use corrected code/explanation from retry if available
+      const finalCode = renderData.manimCode || manimCode;
+      const finalExplanation = renderData.explanation || explanation;
+      const retries = renderData.retries || 0;
+
+      setRetryCount(retries);
       setResult({
         success: renderData.success,
         videoBase64: renderData.videoBase64 || null,
         videoUrl: renderData.videoUrl || null,
-        explanation,
-        manimCode,
+        explanation: finalExplanation,
+        manimCode: finalCode,
         renderError: renderData.renderError || null,
-        retries: 0,
+        retries,
       });
       setPhase("done");
 
@@ -208,6 +214,11 @@ export default function Home() {
                       <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
                         The explanation is available below. You can also view and modify the source code.
                       </p>
+                      {result.renderError && (
+                        <pre className="mt-2 text-xs text-amber-700 dark:text-amber-400/80 bg-amber-100 dark:bg-amber-900/30 rounded-lg p-3 overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-words">
+                          {result.renderError}
+                        </pre>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { renderManimCode } from "@/lib/renderer";
+import { retryWithError } from "@/lib/claude";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
+
+const MAX_RETRIES = 2;
 
 interface RenderRequest {
   manimCode: string;
+  prompt?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -18,13 +22,62 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const renderResult = await renderManimCode(body.manimCode);
+    let currentCode = body.manimCode;
+    let retries = 0;
+    let lastError: string | null = null;
+    let explanation: string | null = null;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const renderResult = await renderManimCode(currentCode);
+
+      if (renderResult.success) {
+        return NextResponse.json({
+          success: true,
+          videoBase64: renderResult.videoBase64 || null,
+          videoUrl: renderResult.videoUrl || null,
+          renderError: null,
+          manimCode: currentCode,
+          explanation,
+          retries,
+        });
+      }
+
+      lastError = renderResult.error || "Unknown render error";
+
+      // Don't retry on timeout — the animation is likely too complex
+      if (lastError.includes("timed out")) {
+        break;
+      }
+
+      // Don't retry if we've exhausted attempts or have no prompt for context
+      if (attempt >= MAX_RETRIES || !body.prompt) {
+        break;
+      }
+
+      // Ask Claude to fix the code
+      try {
+        const fixed = await retryWithError(
+          currentCode,
+          lastError,
+          body.prompt
+        );
+        currentCode = fixed.manimCode;
+        explanation = fixed.explanation;
+        retries++;
+      } catch {
+        // If Claude fails to fix it, return the original render error
+        break;
+      }
+    }
 
     return NextResponse.json({
-      success: renderResult.success,
-      videoBase64: renderResult.videoBase64 || null,
-      videoUrl: renderResult.videoUrl || null,
-      renderError: renderResult.success ? null : renderResult.error,
+      success: false,
+      videoBase64: null,
+      videoUrl: null,
+      renderError: lastError,
+      manimCode: currentCode,
+      explanation,
+      retries,
     });
   } catch (error) {
     const message =
