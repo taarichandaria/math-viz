@@ -27,6 +27,14 @@ MANIM CODE RULES:
 - Prefer Create, Write, FadeIn, FadeOut, Transform, ReplacementTransform for animations
 - Always specify font_size for Text() objects to ensure readability
 
+PERFORMANCE RULES (important — renders time out after 90 seconds):
+- Prefer Text() over Tex() for non-mathematical labels (Text is instant; Tex triggers LaTeX compilation)
+- Minimize the number of unique MathTex() and Tex() objects — each one triggers a separate LaTeX compile. Combine related expressions into a single MathTex() call with multiple strings when possible.
+- Reuse objects with .become() or Transform/ReplacementTransform instead of creating new MathTex instances for similar expressions
+- Use short self.wait() durations: 0.5–1 second between steps, 2 seconds only at the very end
+- Prefer FadeIn/FadeOut over Write/Create for non-essential elements — they render faster
+- Avoid animating many objects simultaneously; sequence animations when possible
+
 EXPLANATION RULES:
 - Write as timestamped narration that syncs with the animation, like a narrator describing what's on screen
 - Each line must start with a timestamp in [M:SS] format, followed by the narration text

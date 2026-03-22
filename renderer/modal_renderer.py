@@ -28,21 +28,38 @@ manim_image = (
         "texlive-fonts-extra",
         "texlive-science",
         "dvisvgm",
+        # OpenGL headless rendering via Xvfb
+        "xvfb",
+        "libgl1-mesa-glx",
+        "libegl1-mesa",
+        "libgles2-mesa",
     )
     .pip_install(
         "manim==0.18.1",
         "fastapi[standard]",
+    )
+    .run_commands(
+        # Pre-warm LaTeX: compile common TeX packages so format files are
+        # baked into the container image, avoiding first-run latency.
+        "python3 -c '"
+        "from manim import MathTex, Tex, Text; "
+        "MathTex(r\"\\\\int_0^1 x^2 \\\\, dx = \\\\frac{1}{3}\"); "
+        "MathTex(r\"\\\\sum_{n=1}^{\\\\infty} \\\\frac{1}{n^2}\"); "
+        "Tex(r\"Hello\"); "
+        "Text(\"warmup\")"
+        "' || true",
     )
 )
 
 app = modal.App("mathviz-renderer", image=manim_image)
 
 
-@app.function(timeout=120, memory=2048, keep_warm=1)
+@app.function(timeout=120, memory=2048, keep_warm=1, gpu="T4")
 @modal.web_endpoint(method="POST")
 def render(request: dict):
     """Receive Manim code, render it, return base64 video."""
     import base64
+    import glob
     import os
     import subprocess
     import tempfile
@@ -60,27 +77,57 @@ def render(request: dict):
         with open(scene_path, "w") as f:
             f.write(code)
 
-        try:
-            result = subprocess.run(
-                [
-                    "manim",
-                    "render",
-                    "-ql",
-                    "--format", "mp4",
-                    "--media_dir", tmpdir,
-                    scene_path,
-                    "MainScene",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=90,
-                cwd=tmpdir,
-            )
-        except subprocess.TimeoutExpired:
-            return {
-                "success": False,
-                "error": "Rendering timed out after 90 seconds. Try a simpler animation.",
-            }
+        # Share a persistent TeX cache across renders on warm containers.
+        # Manim stores compiled LaTeX SVGs in {media_dir}/Tex/ using
+        # content-addressed filenames, so concurrent writes are safe.
+        tex_cache = "/tmp/manim_tex_cache"
+        os.makedirs(tex_cache, exist_ok=True)
+        os.symlink(tex_cache, os.path.join(tmpdir, "Tex"))
+
+        # Use ffmpeg ultrafast preset — trades file size for encoding speed.
+        cfg_path = os.path.join(tmpdir, "manim.cfg")
+        with open(cfg_path, "w") as f:
+            f.write("[CLI]\n")
+            f.write("ffmpeg_extra_args = -preset ultrafast\n")
+
+        # Try OpenGL renderer (GPU-accelerated) first via xvfb for headless
+        # display, then fall back to Cairo if OpenGL fails.
+        opengl_cmd = [
+            "xvfb-run", "-a",
+            "manim", "render",
+            "--renderer=opengl", "--write_to_movie",
+            "-ql",
+            "--format", "mp4",
+            "--media_dir", tmpdir,
+            scene_path,
+            "MainScene",
+        ]
+        cairo_cmd = [
+            "manim", "render",
+            "-ql",
+            "--format", "mp4",
+            "--media_dir", tmpdir,
+            scene_path,
+            "MainScene",
+        ]
+
+        result = None
+        for cmd in [opengl_cmd, cairo_cmd]:
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=90,
+                    cwd=tmpdir,
+                )
+                if result.returncode == 0:
+                    break
+            except subprocess.TimeoutExpired:
+                return {
+                    "success": False,
+                    "error": "Rendering timed out after 90 seconds. Try a simpler animation.",
+                }
 
         if result.returncode != 0:
             error_msg = result.stderr or result.stdout
@@ -89,23 +136,15 @@ def render(request: dict):
             return {"success": False, "error": error_msg}
 
         # Find the output video
-        video_path = None
-        for root, _dirs, files in os.walk(tmpdir):
-            for file in files:
-                if file.endswith(".mp4"):
-                    video_path = os.path.join(root, file)
-                    break
-            if video_path:
-                break
-
-        if not video_path or not os.path.exists(video_path):
+        video_files = glob.glob(os.path.join(tmpdir, "**/*.mp4"), recursive=True)
+        if not video_files:
             return {
                 "success": False,
                 "error": f"Manim completed but no video file was produced.\n"
                          f"stdout: {result.stdout[:500]}\nstderr: {result.stderr[:500]}",
             }
 
-        with open(video_path, "rb") as vf:
+        with open(video_files[0], "rb") as vf:
             video_bytes = vf.read()
 
         video_b64 = base64.b64encode(video_bytes).decode("utf-8")
