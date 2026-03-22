@@ -11,7 +11,6 @@ export interface GenerationResult {
 }
 
 function parseResponse(text: string): GenerationResult {
-  // Try to parse the response as JSON, handling potential markdown fences
   let cleaned = text.trim();
 
   // Remove markdown code fences if present
@@ -19,7 +18,47 @@ function parseResponse(text: string): GenerationResult {
     cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
   }
 
-  const parsed = JSON.parse(cleaned);
+  // Extract the first JSON object — Claude sometimes appends extra text
+  const start = cleaned.indexOf("{");
+  if (start === -1) {
+    throw new Error("No JSON object found in response");
+  }
+
+  // Find the matching closing brace by counting braces
+  let depth = 0;
+  let end = -1;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+    }
+  }
+
+  if (end === -1) {
+    throw new Error("Could not find complete JSON object in response");
+  }
+
+  const parsed = JSON.parse(cleaned.slice(start, end + 1));
 
   if (!parsed.manim_code || !parsed.explanation) {
     throw new Error("Response missing required fields: manim_code, explanation");
