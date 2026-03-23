@@ -12,7 +12,9 @@ interface GenerateRequest {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = isAuthConfigured ? await auth() : null;
+    if (isAuthConfigured) {
+      await auth();
+    }
 
     const body: GenerateRequest = await req.json();
 

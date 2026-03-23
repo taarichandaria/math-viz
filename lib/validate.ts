@@ -28,6 +28,34 @@ const FORBIDDEN_IMPORTS = [
   /\bopen\s*\(/,
 ];
 
+const RISKY_PATTERNS = [
+  {
+    pattern: /\balways_redraw\b/,
+    fix: "Avoid always_redraw; use static objects or a single Transform instead.",
+  },
+  {
+    pattern: /\bValueTracker\b/,
+    fix: "Avoid ValueTracker; it often produces slow renders in this app.",
+  },
+  {
+    pattern: /\bTracedPath\b/,
+    fix: "Avoid TracedPath; use a static diagram or a single highlighted point instead.",
+  },
+  {
+    pattern: /\.add_updater\b/,
+    fix: "Avoid add_updater; use explicit self.play() steps instead.",
+  },
+  {
+    pattern: /\bThreeDScene\b/,
+    fix: "Use Scene instead of ThreeDScene; 3D scenes are too slow for this app.",
+  },
+];
+
+const MAX_MATHTEX_OBJECTS = 6;
+const MAX_PLAY_CALLS = 16;
+const MAX_WAIT_CALLS = 12;
+const MAX_GRAPH_OBJECTS = 2;
+
 export function validateManimCode(code: string): ValidationResult {
   const errors: string[] = [];
 
@@ -58,9 +86,13 @@ export function validateManimCode(code: string): ValidationResult {
     }
   }
 
+  for (const { pattern, fix } of RISKY_PATTERNS) {
+    if (pattern.test(code)) {
+      errors.push(fix);
+    }
+  }
+
   // Check for non-raw strings in MathTex/Tex calls (the #1 failure cause)
-  // Match MathTex(" or Tex(" NOT preceded by r
-  const nonRawLatex = /(?:MathTex|Tex)\s*\(\s*"(?!.*r").*\\[a-zA-Z]/;
   // More precise: find MathTex/Tex calls and check each string arg
   const texCalls = code.matchAll(/(?:MathTex|(?<!\w)Tex)\s*\(([^)]+)\)/g);
   for (const match of texCalls) {
@@ -75,6 +107,42 @@ export function validateManimCode(code: string): ValidationResult {
       );
       break; // One warning is enough
     }
+  }
+
+  const mathTexCount = [
+    ...(code.match(/\bMathTex\s*\(/g) || []),
+    ...(code.match(/(?<!\w)\bTex\s*\(/g) || []),
+  ].length;
+  if (mathTexCount > MAX_MATHTEX_OBJECTS) {
+    errors.push(
+      `Scene is too complex: found ${mathTexCount} MathTex/Tex objects. Keep it to ${MAX_MATHTEX_OBJECTS} or fewer.`
+    );
+  }
+
+  const playCallCount = (code.match(/\bself\.play\s*\(/g) || []).length;
+  if (playCallCount > MAX_PLAY_CALLS) {
+    errors.push(
+      `Scene is too complex: found ${playCallCount} self.play() calls. Keep it to ${MAX_PLAY_CALLS} or fewer.`
+    );
+  }
+
+  const waitCallCount = (code.match(/\bself\.wait\s*\(/g) || []).length;
+  if (waitCallCount > MAX_WAIT_CALLS) {
+    errors.push(
+      `Scene is too complex: found ${waitCallCount} self.wait() calls. Keep it to ${MAX_WAIT_CALLS} or fewer.`
+    );
+  }
+
+  const graphObjectCount = [
+    ...(code.match(/\bAxes\s*\(/g) || []),
+    ...(code.match(/\bNumberPlane\s*\(/g) || []),
+    ...(code.match(/\bFunctionGraph\s*\(/g) || []),
+    ...(code.match(/\.plot\s*\(/g) || []),
+  ].length;
+  if (graphObjectCount > MAX_GRAPH_OBJECTS) {
+    errors.push(
+      `Scene is too complex: found ${graphObjectCount} graph/axes constructions. Keep it to ${MAX_GRAPH_OBJECTS} or fewer.`
+    );
   }
 
   return {

@@ -28,6 +28,8 @@ MANIM CODE RULES:
 - Do NOT use any external files, images, or assets
 - Do NOT import any modules other than manim
 - Use VGroup for grouping related objects
+- Prefer static diagrams plus a few clear highlights over continuous motion
+- Never use ValueTracker, always_redraw, TracedPath, add_updater, or ThreeDScene
 
 ALLOWED ANIMATIONS (use ONLY these):
 - Create, Write, FadeIn, FadeOut, Transform, ReplacementTransform
@@ -52,14 +54,17 @@ DEPRECATED — DO NOT USE:
 - Tex() → use MathTex() for math, Text() for labels
 
 COMPLEXITY LIMITS (renders time out after 90 seconds):
-- Maximum 10 unique MathTex/Tex objects in the entire scene
-- Maximum 25 self.play() calls
-- Keep total animation under 45 seconds
+- Maximum 6 unique MathTex/Tex objects in the entire scene
+- Maximum 16 self.play() calls
+- Keep total animation under 20 seconds
+- Use at most one Axes or NumberPlane, and at most one plotted curve
 - Prefer Text() over MathTex() for non-math text (Text is instant; MathTex triggers LaTeX)
 - Reuse objects with Transform/ReplacementTransform instead of creating new ones
 - Use short self.wait() durations: 0.5–1s between steps, 2s only at the end
 - Prefer FadeIn/FadeOut over Write/Create for non-essential elements
 - Avoid animating many objects simultaneously; sequence animations
+- Avoid repeated dashed guides, dense grids, or many individually animated labels
+- If the concept is complex, show one representative case rather than many cases
 
 EXPLANATION RULES:
 - Write as timestamped narration that syncs with the animation
@@ -101,9 +106,12 @@ export const RETRY_PROMPT = (originalCode: string, error: string) => {
   }
   if (isTimeoutError) {
     extraGuidance = `\nTIMEOUT FIX — SIMPLIFY DRASTICALLY:
-- Cut MathTex objects to 5 or fewer
-- Cut self.play() calls to 15 or fewer
-- Remove any complex animations (many simultaneous transforms)
+- Cut MathTex objects to 4 or fewer
+- Cut self.play() calls to 10 or fewer
+- Keep the full scene under about 12 seconds
+- Keep only one graph/axes snapshot if a graph is needed
+- Remove repeated guides, braces, or multiple case breakdowns
+- Remove any continuous motion or updater-style behavior
 - Use Text() instead of MathTex() wherever possible
 - Shorten all self.wait() to 0.5s`;
   }
@@ -133,9 +141,10 @@ BEFORE RETURNING, VERIFY:
 1. All MathTex/Tex arguments use raw strings: r"..."
 2. Class is named MainScene(Scene) with def construct(self)
 3. No deprecated APIs (ShowCreation, TextMobject, TexMobject, ApplyMethod)
-4. Fewer than 10 MathTex objects total
+4. Fewer than 6 MathTex objects total
 5. No external imports beyond manim
-6. All LaTeX commands are basic and standard
+6. No ValueTracker, always_redraw, TracedPath, add_updater, or ThreeDScene
+7. All LaTeX commands are basic and standard
 
 Return ONLY the corrected JSON object. No markdown fences, no extra text.`;
 };

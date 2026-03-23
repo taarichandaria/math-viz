@@ -63,6 +63,9 @@ async def render(request: RenderRequest):
         with open(cfg_path, "w") as f:
             f.write("[CLI]\n")
             f.write("ffmpeg_extra_args = -preset ultrafast\n")
+            f.write("frame_rate = 12\n")
+            f.write("pixel_width = 854\n")
+            f.write("pixel_height = 480\n")
 
         # Run Manim
         try:

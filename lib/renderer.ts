@@ -30,13 +30,14 @@ export async function renderManimCode(code: string): Promise<RenderResult> {
       method: "POST",
       headers,
       body: JSON.stringify({ code }),
-      signal: AbortSignal.timeout(50_000), // 50s timeout to fit within Vercel 60s limit
+      signal: AbortSignal.timeout(110_000),
     });
   } catch (err) {
     if (err instanceof Error && err.name === "TimeoutError") {
       return {
         success: false,
-        error: "Rendering timed out — the animation may be too complex. Try a simpler prompt.",
+        error:
+          "Rendering timed out after 110 seconds — simplifying the animation and retrying may help.",
       };
     }
     throw err;

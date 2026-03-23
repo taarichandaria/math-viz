@@ -75,9 +75,6 @@ export async function POST(req: NextRequest) {
 
       lastError = renderResult.error || "Unknown render error";
 
-      // Don't retry on timeout — the animation is likely too complex
-      if (lastError.includes("timed out")) break;
-
       // Don't retry if we've exhausted attempts
       if (attempt >= MAX_RETRIES) break;
 

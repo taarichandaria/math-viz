@@ -28,11 +28,6 @@ manim_image = (
         "texlive-fonts-extra",
         "texlive-science",
         "dvisvgm",
-        # OpenGL headless rendering via Xvfb
-        "xvfb",
-        "libgl1-mesa-glx",
-        "libegl1-mesa",
-        "libgles2-mesa",
     )
     .pip_install(
         "manim==0.18.1",
@@ -54,7 +49,7 @@ manim_image = (
 app = modal.App("mathviz-renderer", image=manim_image)
 
 
-@app.function(timeout=120, memory=2048, keep_warm=1, gpu="T4")
+@app.function(timeout=120, memory=2048, keep_warm=1)
 @modal.web_endpoint(method="POST")
 def render(request: dict):
     """Receive Manim code, render it, return base64 video."""
@@ -89,19 +84,10 @@ def render(request: dict):
         with open(cfg_path, "w") as f:
             f.write("[CLI]\n")
             f.write("ffmpeg_extra_args = -preset ultrafast\n")
+            f.write("frame_rate = 12\n")
+            f.write("pixel_width = 854\n")
+            f.write("pixel_height = 480\n")
 
-        # Try OpenGL renderer (GPU-accelerated) first via xvfb for headless
-        # display, then fall back to Cairo if OpenGL fails.
-        opengl_cmd = [
-            "xvfb-run", "-a",
-            "manim", "render",
-            "--renderer=opengl", "--write_to_movie",
-            "-ql",
-            "--format", "mp4",
-            "--media_dir", tmpdir,
-            scene_path,
-            "MainScene",
-        ]
         cairo_cmd = [
             "manim", "render",
             "-ql",
@@ -111,23 +97,19 @@ def render(request: dict):
             "MainScene",
         ]
 
-        result = None
-        for cmd in [opengl_cmd, cairo_cmd]:
-            try:
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=90,
-                    cwd=tmpdir,
-                )
-                if result.returncode == 0:
-                    break
-            except subprocess.TimeoutExpired:
-                return {
-                    "success": False,
-                    "error": "Rendering timed out after 90 seconds. Try a simpler animation.",
-                }
+        try:
+            result = subprocess.run(
+                cairo_cmd,
+                capture_output=True,
+                text=True,
+                timeout=90,
+                cwd=tmpdir,
+            )
+        except subprocess.TimeoutExpired:
+            return {
+                "success": False,
+                "error": "Rendering timed out after 90 seconds. Try a simpler animation.",
+            }
 
         if result.returncode != 0:
             error_msg = result.stderr or result.stdout
